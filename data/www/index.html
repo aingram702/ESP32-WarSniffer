@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#04140d">
+  <title>WarSniffer</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="/logo.svg" alt="" class="logo" width="34" height="34">
+      <div class="brand-txt">
+        <span class="brand-name">WAR<span class="accent">SNIFFER</span></span>
+        <span class="brand-sub">802.11 packet recon</span>
+      </div>
+    </div>
+    <div class="status-strip">
+      <span class="stat" id="st-ch">CH —</span>
+      <span class="stat" id="st-pps">0 pps</span>
+      <span class="stat" id="st-frames">0 frames</span>
+      <span class="stat" id="st-dev">0 AP / 0 STA</span>
+      <span class="badge" id="st-alerts">0 alerts</span>
+      <span class="link-dot" id="st-link" title="WebSocket link">●</span>
+      <button id="btn-capture" class="cap-btn">◼ STOP</button>
+    </div>
+  </header>
+
+  <div id="pw-warning" class="banner hidden">
+    ⚠ Default AP password in use. Set a strong WPA2 password in
+    <a href="#" data-tab="settings" class="navlink">Settings</a>.
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="live">▣ Live</button>
+    <button class="tab" data-tab="dash">▤ Dashboard</button>
+    <button class="tab" data-tab="devices">▥ Devices</button>
+    <button class="tab" data-tab="alerts">⚑ Alerts</button>
+    <button class="tab" data-tab="filters">⊚ Filters</button>
+    <button class="tab" data-tab="pcap">⤓ PCAP</button>
+    <button class="tab" data-tab="settings">⚙ Settings</button>
+  </nav>
+
+  <main>
+    <!-- LIVE -->
+    <section class="panel active" id="tab-live">
+      <div class="toolbar">
+        <input type="text" id="live-search" placeholder="quick filter rows (src, ssid, proto…)">
+        <label class="chk"><input type="checkbox" id="live-pause"> pause</label>
+        <button id="live-clear" class="btn">clear view</button>
+        <button id="buf-clear" class="btn danger">flush device buffer</button>
+      </div>
+      <div class="split">
+        <div class="table-wrap">
+          <table class="frames">
+            <thead><tr>
+              <th>#</th><th>t</th><th>ch</th><th>rssi</th><th>type</th>
+              <th>sub</th><th>proto</th><th>src</th><th>dst</th><th>info</th>
+            </tr></thead>
+            <tbody id="frame-rows"></tbody>
+          </table>
+        </div>
+        <aside class="detail" id="detail">
+          <div class="detail-empty">select a frame to inspect</div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="panel" id="tab-dash">
+      <div class="cards">
+        <div class="card"><span class="card-k">Total frames</span><span class="card-v" id="d-frames">0</span></div>
+        <div class="card"><span class="card-k">Dropped</span><span class="card-v" id="d-drop">0</span></div>
+        <div class="card"><span class="card-k">Bytes</span><span class="card-v" id="d-bytes">0</span></div>
+        <div class="card"><span class="card-k">Encrypted</span><span class="card-v" id="d-enc">0</span></div>
+      </div>
+      <div class="grid2">
+        <div class="box">
+          <h3>Packets / sec (60s)</h3>
+          <canvas id="pps-canvas" height="120"></canvas>
+        </div>
+        <div class="box">
+          <h3>Per-channel volume</h3>
+          <canvas id="chan-canvas" height="120"></canvas>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="box">
+          <h3>Frame types</h3>
+          <div id="type-bars" class="bars"></div>
+        </div>
+        <div class="box">
+          <h3>Protocols</h3>
+          <div id="proto-bars" class="bars"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEVICES -->
+    <section class="panel" id="tab-devices">
+      <h3>Access Points <span class="muted" id="ap-n">0</span></h3>
+      <div class="table-wrap">
+        <table class="dev"><thead><tr>
+          <th>BSSID</th><th>SSID</th><th>ch</th><th>rssi</th><th>enc</th>
+          <th>beacons</th><th>vendor</th><th>age</th>
+        </tr></thead><tbody id="ap-rows"></tbody></table>
+      </div>
+      <h3>Stations <span class="muted" id="sta-n">0</span></h3>
+      <div class="table-wrap">
+        <table class="dev"><thead><tr>
+          <th>MAC</th><th>rssi</th><th>frames</th><th>rnd</th>
+          <th>assoc BSSID</th><th>probe</th><th>vendor</th><th>age</th>
+        </tr></thead><tbody id="sta-rows"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="panel" id="tab-alerts">
+      <div class="toolbar">
+        <button id="alerts-clear" class="btn danger">clear alerts</button>
+      </div>
+      <div id="alert-list" class="alert-list"></div>
+    </section>
+
+    <!-- FILTERS -->
+    <section class="panel" id="tab-filters">
+      <div class="box">
+        <h3>BPF-style expression</h3>
+        <p class="muted small">e.g. <code>type mgmt and subtype deauth</code> ·
+          <code>proto eapol or pmkid</code> · <code>wlan host aa:bb:cc:dd:ee:ff</code> ·
+          <code>channel 6 and rssi &gt; -70</code></p>
+        <div class="row">
+          <input type="text" id="bpf-input" placeholder="bpf expression (blank = all)">
+          <button id="bpf-apply" class="btn">compile</button>
+        </div>
+        <div id="bpf-status" class="muted small"></div>
+        <label class="chk"><input type="checkbox" id="filter-enabled"> master filter enabled</label>
+      </div>
+      <div class="grid2">
+        <div class="box">
+          <h3>MAC list <span class="muted" id="mac-mode">(blacklist)</span></h3>
+          <label class="chk"><input type="checkbox" id="mac-whitelist"> use as whitelist</label>
+          <div class="row">
+            <input type="text" id="mac-input" placeholder="aa:bb:cc:dd:ee:ff">
+            <input type="text" id="mac-note" placeholder="note" class="narrow">
+            <button id="mac-add" class="btn">add</button>
+          </div>
+          <ul id="mac-list" class="chiplist"></ul>
+        </div>
+        <div class="box">
+          <h3>SSID list</h3>
+          <div class="row">
+            <input type="text" id="ssid-input" placeholder="network name">
+            <select id="ssid-mode"><option value="include">include</option><option value="exclude">exclude</option></select>
+            <button id="ssid-add" class="btn">add</button>
+          </div>
+          <ul id="ssid-list" class="chiplist"></ul>
+        </div>
+      </div>
+      <div class="box">
+        <h3>Frame-type capture</h3>
+        <label class="chk"><input type="checkbox" id="cap_mgmt"> management</label>
+        <label class="chk"><input type="checkbox" id="cap_ctrl"> control</label>
+        <label class="chk"><input type="checkbox" id="cap_data"> data</label>
+      </div>
+    </section>
+
+    <!-- PCAP -->
+    <section class="panel" id="tab-pcap">
+      <div class="box">
+        <h3>PCAP logging</h3>
+        <label class="chk"><input type="checkbox" id="pcap_enabled"> write capture to PCAP</label>
+        <label class="chk"><input type="checkbox" id="pcap_radiotap"> include radiotap (RSSI/channel)</label>
+        <p class="muted small">Files rotate automatically and are downloadable for Wireshark.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="dev"><thead><tr><th>file</th><th>size</th><th></th></tr></thead>
+        <tbody id="pcap-rows"></tbody></table>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="panel" id="tab-settings">
+      <div class="grid2">
+        <div class="box">
+          <h3>Access Point</h3>
+          <label>SSID <input type="text" id="ap_ssid" maxlength="32"></label>
+          <label>Password <input type="password" id="ap_password" placeholder="leave blank = unchanged" maxlength="63"></label>
+          <label>AP channel <input type="number" id="ap_channel" min="1" max="13"></label>
+          <label class="chk"><input type="checkbox" id="ap_hidden"> hide SSID</label>
+          <p class="muted small">AP changes apply after reboot.</p>
+        </div>
+        <div class="box">
+          <h3>Capture / channels</h3>
+          <label class="chk"><input type="checkbox" id="channel_hop"> channel hopping</label>
+          <label class="chk"><input type="checkbox" id="hop_pause_on_client"> lock to AP channel while UI connected</label>
+          <label>Hop dwell (ms) <input type="number" id="hop_interval_ms" min="50" max="5000"></label>
+          <label>Fixed channel <input type="number" id="fixed_channel" min="1" max="14"></label>
+          <div id="chan-grid" class="chan-grid"></div>
+          <label>Snap length (bytes) <input type="number" id="snap_len" min="64" max="512"></label>
+          <label>Live stream max pps <input type="number" id="ws_max_pps" min="1" max="200"></label>
+        </div>
+        <div class="box">
+          <h3>Detection</h3>
+          <label class="chk"><input type="checkbox" id="det_deauth"> deauth flood</label>
+          <label class="chk"><input type="checkbox" id="det_beacon_flood"> beacon flood</label>
+          <label class="chk"><input type="checkbox" id="det_evil_twin"> evil twin</label>
+          <label class="chk"><input type="checkbox" id="det_pmkid"> PMKID</label>
+          <label class="chk"><input type="checkbox" id="det_arp_spoof"> ARP spoofing</label>
+          <label class="chk"><input type="checkbox" id="det_dns_anomaly"> DNS anomaly</label>
+          <label>Deauth threshold/s <input type="number" id="det_deauth_threshold" min="2" max="1000"></label>
+          <label>Beacon threshold/s <input type="number" id="det_beacon_threshold" min="5" max="1000"></label>
+        </div>
+        <div class="box">
+          <h3>Geolocation tag</h3>
+          <label class="chk"><input type="checkbox" id="geo_enabled"> tag captures with location</label>
+          <label>Label <input type="text" id="geo_label" maxlength="31"></label>
+          <label>Latitude <input type="number" id="geo_lat" step="0.000001"></label>
+          <label>Longitude <input type="number" id="geo_lon" step="0.000001"></label>
+          <button id="geo-here" class="btn">use browser location</button>
+        </div>
+      </div>
+      <div class="settings-actions">
+        <button id="settings-save" class="btn primary">save settings</button>
+        <button id="btn-reboot" class="btn">reboot</button>
+        <button id="btn-factory" class="btn danger">factory reset</button>
+        <span class="muted small" id="settings-status"></span>
+      </div>
+      <p class="muted small fwinfo" id="fwinfo"></p>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
