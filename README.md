@@ -26,6 +26,11 @@ floods) — all over its own out-of-band Wi-Fi access point.
 > **not** transmit attack frames.
 
 ---
+## Live Packet Capture
+![WarSniffer-Live Page](warsniffer-live.png)
+
+## Dashboard
+![WarSniffer Dashboard Page](warsniffer-dashboard.png)
 
 ## Features
 
