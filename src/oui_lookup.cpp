@@ -80,7 +80,8 @@ const char* OuiLookup::lookup(const uint8_t mac[6], char* out, size_t outLen) {
     for (size_t i = 0; i < OUI_TABLE_LEN; i++) {
         uint32_t e = pgm_read_dword(&OUI_TABLE[i].oui);
         if (e == oui) {
-            strlcpy_P(out, (PGM_P)pgm_read_ptr(&OUI_TABLE[i].vendor), outLen);
+            strncpy_P(out, (PGM_P)pgm_read_ptr(&OUI_TABLE[i].vendor), outLen);
+            out[outLen - 1] = '\0';
             return out;
         }
     }
