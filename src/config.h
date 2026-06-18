@@ -39,7 +39,7 @@
 // Captured-frame ring buffer (lives in PSRAM). Each slot stores a trimmed
 // copy of the frame (headers + snap length of payload) plus metadata.
 #define RING_CAPACITY_FRAMES     2048   // number of frame slots
-#define DEFAULT_SNAP_LEN         256    // bytes of each frame retained
+#define DEFAULT_SNAP_LEN         512    // bytes of each frame retained (deeper L7 = better cred/parse visibility)
 #define MAX_SNAP_LEN             512
 
 // Live WebSocket stream: max frames/sec pushed to browser (back-pressure).
@@ -67,6 +67,10 @@
 #define DET_MAX_TRACKED_APS          128
 #define DET_MAX_TRACKED_STAS         256
 #define DET_MAX_ALERTS               128   // alert ring buffer
+
+// ---- Cleartext credential harvesting --------------------------------------
+#define CRED_MAX_ENTRIES             96    // captured-credential ring buffer
+#define CRED_MAX_PENDING             24    // pending USER/AUTH state (FTP/POP3/SMTP)
 
 // ---- Misc -----------------------------------------------------------------
 #define NVS_NAMESPACE            "warsniffer"

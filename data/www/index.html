@@ -25,6 +25,7 @@
       <span class="stat" id="st-frames">0 frames</span>
       <span class="stat" id="st-dev">0 AP / 0 STA</span>
       <span class="badge" id="st-alerts">0 alerts</span>
+      <span class="badge" id="st-creds">0 creds</span>
       <span class="link-dot" id="st-link" title="WebSocket link">●</span>
       <button id="btn-capture" class="cap-btn">◼ STOP</button>
     </div>
@@ -40,6 +41,7 @@
     <button class="tab" data-tab="dash">▤ Dashboard</button>
     <button class="tab" data-tab="devices">▥ Devices</button>
     <button class="tab" data-tab="alerts">⚑ Alerts</button>
+    <button class="tab" data-tab="creds">🔑 Creds</button>
     <button class="tab" data-tab="filters">⊚ Filters</button>
     <button class="tab" data-tab="pcap">⤓ PCAP</button>
     <button class="tab" data-tab="settings">⚙ Settings</button>
@@ -124,6 +126,21 @@
         <button id="alerts-clear" class="btn danger">clear alerts</button>
       </div>
       <div id="alert-list" class="alert-list"></div>
+    </section>
+
+    <!-- CREDS -->
+    <section class="panel" id="tab-creds">
+      <div class="toolbar">
+        <label class="chk"><input type="checkbox" id="cred-mask" checked> mask passwords</label>
+        <button id="creds-clear" class="btn danger">clear credentials</button>
+        <span class="muted small">Only plaintext traffic (open networks / unencrypted protocols) yields results.</span>
+      </div>
+      <div class="table-wrap">
+        <table class="dev"><thead><tr>
+          <th>time</th><th>proto</th><th>server</th><th>username</th>
+          <th>password</th><th>context</th><th>client</th><th>ch</th>
+        </tr></thead><tbody id="cred-rows"></tbody></table>
+      </div>
     </section>
 
     <!-- FILTERS -->
@@ -214,6 +231,9 @@
           <label class="chk"><input type="checkbox" id="det_dns_anomaly"> DNS anomaly</label>
           <label>Deauth threshold/s <input type="number" id="det_deauth_threshold" min="2" max="1000"></label>
           <label>Beacon threshold/s <input type="number" id="det_beacon_threshold" min="5" max="1000"></label>
+          <hr class="sep">
+          <label class="chk"><input type="checkbox" id="cred_harvest"> harvest cleartext credentials</label>
+          <p class="muted small">Extracts logins from unencrypted HTTP/FTP/POP3/IMAP/SMTP traffic. Authorized testing only.</p>
         </div>
         <div class="box">
           <h3>Geolocation tag</h3>

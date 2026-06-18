@@ -15,6 +15,8 @@ const MAX_ROWS = 500;
 let paused = false;
 let capturing = true;
 let alertCursor = 0;
+let credCursor = 0;
+let lastCredCount = 0;
 let selectedId = null;
 
 /* ---- tabs ---------------------------------------------------------------- */
@@ -23,6 +25,7 @@ function showTab(name) {
   $$('.panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
   if (name === 'devices') loadDevices();
   if (name === 'alerts')  loadAlerts(true);
+  if (name === 'creds')   loadCreds(true);
   if (name === 'filters') loadFilters();
   if (name === 'pcap')    loadPcap();
   if (name === 'settings')loadSettings();
@@ -116,6 +119,10 @@ function refreshStatus() {
     const ab = $('#st-alerts');
     ab.textContent = fmt(s.alert_count) + ' alerts';
     ab.classList.toggle('hot', s.alert_count > 0);
+    const cb = $('#st-creds');
+    cb.textContent = fmt(s.cred_count) + ' creds';
+    cb.classList.toggle('hot', s.cred_count > 0);
+    lastCredCount = s.cred_count;
     setCaptureBtn(s.capturing);
     $('#pw-warning').classList.toggle('hidden', !s.default_password);
     $('#fwinfo').textContent =
@@ -208,6 +215,39 @@ function loadAlerts(reset) {
 $('#alerts-clear').addEventListener('click', () =>
   post('/api/alerts/clear').then(() => { alertCursor = 0; $('#alert-list').innerHTML = ''; }));
 
+/* ---- credentials --------------------------------------------------------- */
+function credRow(c) {
+  const masked = $('#cred-mask').checked;
+  const pw = masked
+    ? `<span class="pw" data-pw="${esc(c.password)}">${'•'.repeat(Math.min(c.password.length, 12)) || '—'}</span>`
+    : `<span class="pw-shown">${esc(c.password) || '—'}</span>`;
+  return `<tr><td>${new Date(c.ts * 1000).toLocaleTimeString()}</td>` +
+    `<td><span class="tag">${esc(c.proto)}</span></td>` +
+    `<td>${esc(c.dst)}:${c.port}</td>` +
+    `<td class="cred-user">${esc(c.username) || '—'}</td>` +
+    `<td class="cred-pass">${pw}</td>` +
+    `<td>${esc(c.context) || ''}</td><td>${esc(c.src)}</td><td>${c.channel}</td></tr>`;
+}
+function loadCreds(reset) {
+  if (reset) { credCursor = 0; $('#cred-rows').innerHTML = ''; }
+  api('/api/creds?since=' + credCursor).then(d => {
+    (d.creds || []).forEach(c => {
+      credCursor = Math.max(credCursor, c.id);
+      $('#cred-rows').insertAdjacentHTML('afterbegin', credRow(c));
+    });
+    if (!$('#cred-rows').childElementCount)
+      $('#cred-rows').innerHTML = '<tr><td colspan="8" class="muted">no cleartext credentials captured yet</td></tr>';
+  });
+}
+$('#creds-clear').addEventListener('click', () =>
+  post('/api/creds/clear').then(() => { credCursor = 0; lastCredCount = 0; loadCreds(true); }));
+// toggle reveal/mask: re-render current view
+$('#cred-mask').addEventListener('change', () => { credCursor = 0; loadCreds(true); });
+// click a masked password to reveal just that one
+$('#cred-rows').addEventListener('click', e => {
+  const s = e.target.closest('.pw'); if (s) s.outerHTML = `<span class="pw-shown">${esc(s.dataset.pw)}</span>`;
+});
+
 /* ---- filters ------------------------------------------------------------- */
 function loadFilters() {
   api('/api/filters').then(d => {
@@ -275,7 +315,7 @@ $('#pcap-rows').addEventListener('click', e => {
 const SET_FIELDS = ['ap_ssid', 'ap_channel', 'ap_hidden', 'channel_hop', 'hop_pause_on_client',
   'hop_interval_ms', 'fixed_channel', 'snap_len', 'ws_max_pps', 'det_deauth', 'det_beacon_flood',
   'det_evil_twin', 'det_pmkid', 'det_arp_spoof', 'det_dns_anomaly', 'det_deauth_threshold',
-  'det_beacon_threshold', 'geo_enabled', 'geo_label', 'geo_lat', 'geo_lon'];
+  'det_beacon_threshold', 'cred_harvest', 'geo_enabled', 'geo_label', 'geo_lat', 'geo_lon'];
 function loadSettings() {
   api('/api/settings').then(s => {
     SET_FIELDS.forEach(k => {
@@ -338,6 +378,14 @@ function connectWs() {
       $('#st-dev').textContent = `${m.ap} AP / ${m.sta} STA`;
       const ab = $('#st-alerts'); ab.textContent = fmt(m.alerts) + ' alerts';
       ab.classList.toggle('hot', m.alerts > 0);
+      if (typeof m.creds === 'number') {
+        const cb = $('#st-creds'); cb.textContent = fmt(m.creds) + ' creds';
+        cb.classList.toggle('hot', m.creds > 0);
+        if (m.creds > lastCredCount) {
+          lastCredCount = m.creds;
+          if ($('#tab-creds').classList.contains('active')) loadCreds(false);
+        }
+      }
       if ($('#tab-dash').classList.contains('active')) loadStats();
       if (m.alert) {
         if ($('#tab-alerts').classList.contains('active')) loadAlerts(false);

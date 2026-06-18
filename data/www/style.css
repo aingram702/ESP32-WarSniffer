@@ -151,5 +151,12 @@ canvas{width:100%;display:block}
 .chan-grid label{margin:0;padding:4px 6px;border:1px solid var(--line);border-radius:4px;
   display:flex;gap:4px;align-items:center;color:var(--txt)}
 
+/* credentials */
+hr.sep{border:none;border-top:1px solid var(--line);margin:10px 0}
+.cred-user{color:var(--accent)}
+.cred-pass .pw{cursor:pointer;color:var(--warn);letter-spacing:2px}
+.cred-pass .pw:hover{text-decoration:underline}
+.cred-pass .pw-shown{color:var(--crit);font-weight:700;word-break:break-all}
+
 .settings-actions{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
 .fwinfo{margin-top:14px;border-top:1px solid var(--line);padding-top:8px}

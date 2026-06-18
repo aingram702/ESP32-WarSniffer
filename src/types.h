@@ -123,6 +123,12 @@ struct ParsedFrame {
     // DNS (when app == APP_DNS)
     bool      dns_is_response;
     uint16_t  dns_answers;
+
+    // IPv4 addressing + L7 payload location (within the captured buffer)
+    uint8_t   ipv4_src[4];
+    uint8_t   ipv4_dst[4];
+    uint16_t  l7_off;          // offset of TCP/UDP payload in frame buffer (0 = none)
+    uint16_t  l7_len;          // bytes of L7 payload available in the capture
 };
 
 // ---------------------------------------------------------------------------

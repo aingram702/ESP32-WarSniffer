@@ -48,6 +48,9 @@ struct Settings {
     uint16_t det_deauth_threshold;
     uint16_t det_beacon_threshold;
 
+    // ---- Cleartext credential harvesting (unencrypted traffic only) ----
+    bool     cred_harvest;
+
     // ---- Geolocation tagging ----
     bool     geo_enabled;
     double   geo_lat;

@@ -56,6 +56,9 @@ floods) — all over its own out-of-band Wi-Fi access point.
 - Optional geolocation tagging of a capture session
 - **IDS:** deauth/disassoc flood, evil-twin AP, PMKID exposure, ARP spoofing,
   DNS anomaly, beacon flood detection — with a rate-limited alert feed
+- **Cleartext credential harvesting** — extracts logins that cross the air
+  unencrypted (HTTP Basic, HTTP login forms, FTP, POP3, IMAP, SMTP AUTH) into
+  a dedicated *Creds* table (passwords masked by default)
 
 **Platform**
 - Self-hosted WPA2 access point for out-of-band management + captive portal
@@ -123,6 +126,24 @@ wlan host de:ad:be:ef:00:01 and type data
 ```
 
 ---
+
+## Cleartext credential harvesting
+
+The *Creds* tab lists credentials seen **in the clear**. WarSniffer never
+decrypts anything — it can only read what is already plaintext on the air:
+
+- The Wi-Fi must be unencrypted (an **open** network), since WPA2 data frames
+  are encrypted and unreadable, **and**
+- the application protocol must itself be plaintext.
+
+Recognised sources: HTTP Basic auth, HTTP login-form bodies/query strings, and
+the `USER`/`PASS`/`LOGIN`/`AUTH` exchanges of FTP, POP3, IMAP and SMTP.
+Capture works best with **snap length at the maximum (512)** so request headers
+and bodies are retained. Toggle the feature in *Settings → Detection*.
+
+> This is an auditing aid for demonstrating the risk of unencrypted protocols on
+> networks you are authorized to test. Do not use it to intercept traffic you
+> have no permission to access.
 
 ## Channel hopping vs. the web UI
 

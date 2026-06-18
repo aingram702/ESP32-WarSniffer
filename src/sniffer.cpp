@@ -9,6 +9,7 @@
 #include "ring_buffer.h"
 #include "statistics.h"
 #include "detector.h"
+#include "credentials.h"
 #include "pcap_writer.h"
 #include "status_led.h"
 
@@ -148,6 +149,7 @@ void Sniffer::process(const uint8_t* data, uint16_t cap, int8_t rssi,
     RingBuffer::instance().push(pf, data, cap);
     Statistics::instance().ingest(pf);
     Detectors::instance().inspect(pf);
+    CredentialHarvester::instance().inspect(pf, data, cap);
 
     Settings& s = SettingsStore::instance().get();
     if (s.pcap_enabled && PcapWriter::instance().isOpen()) {

@@ -18,7 +18,7 @@ constexpr uint16_t ET_ARP   = 0x0806;
 constexpr uint16_t ET_IPV6  = 0x86DD;
 constexpr uint16_t ET_EAPOL = 0x888E;
 
-void classifyL3L4(const uint8_t* p, uint16_t avail, ParsedFrame& out);
+void classifyL3L4(const uint8_t* p, uint16_t avail, uint16_t l3_off, ParsedFrame& out);
 
 }  // namespace
 
@@ -142,7 +142,7 @@ bool parse(const uint8_t* buf, uint16_t len, uint8_t channel, int8_t rssi,
                     break;
                 case ET_IPV4:
                     out.l3 = L3_IPV4;
-                    classifyL3L4(l3, avail, out);
+                    classifyL3L4(l3, avail, (uint16_t)(hdr + 8), out);
                     break;
                 default:
                     out.l3 = L3_OTHER;
@@ -208,10 +208,12 @@ const char* subtypeName(uint8_t type, uint8_t subtype) {
 
 namespace {
 
-void classifyL3L4(const uint8_t* p, uint16_t avail, ParsedFrame& out) {
+void classifyL3L4(const uint8_t* p, uint16_t avail, uint16_t l3_off, ParsedFrame& out) {
     if (avail < 20) return;
     uint8_t ihl = (p[0] & 0x0F) * 4;
     if (ihl < 20 || ihl > avail) return;
+    memcpy(out.ipv4_src, p + 12, 4);
+    memcpy(out.ipv4_dst, p + 16, 4);
     uint8_t proto = p[9];
     const uint8_t* l4 = p + ihl;
     uint16_t l4avail = avail - ihl;
@@ -225,6 +227,19 @@ void classifyL3L4(const uint8_t* p, uint16_t avail, ParsedFrame& out) {
     if (l4avail < 4) return;
     out.src_port = rd16be(l4);
     out.dst_port = rd16be(l4 + 2);
+
+    // Locate the L7 payload (TCP data / UDP data) within the captured buffer.
+    uint16_t l4hdr = 0;
+    if (out.l4 == L4_TCP) {
+        if (l4avail < 20) { l4hdr = 0; }
+        else { l4hdr = ((l4[12] >> 4) & 0x0F) * 4; if (l4hdr < 20) l4hdr = 20; }
+    } else if (out.l4 == L4_UDP) {
+        l4hdr = 8;
+    }
+    if (l4hdr && l4avail > l4hdr) {
+        out.l7_off = l3_off + ihl + l4hdr;
+        out.l7_len = l4avail - l4hdr;
+    }
 
     uint16_t sp = out.src_port, dp = out.dst_port;
     auto isPort = [&](uint16_t x) { return sp == x || dp == x; };

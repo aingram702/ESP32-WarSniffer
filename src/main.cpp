@@ -24,6 +24,7 @@
 #include "ring_buffer.h"
 #include "statistics.h"
 #include "detector.h"
+#include "credentials.h"
 #include "filter.h"
 #include "pcap_writer.h"
 #include "sniffer.h"
@@ -73,6 +74,7 @@ void setup() {
     ok &= RingBuffer::instance().begin();   // PSRAM pool
     Statistics::instance().begin();
     Detectors::instance().begin();
+    CredentialHarvester::instance().begin();
     PcapWriter::instance().begin();
     ok &= Sniffer::instance().begin();
 

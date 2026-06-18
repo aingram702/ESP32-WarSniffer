@@ -58,6 +58,8 @@ void Settings::setDefaults() {
     det_deauth_threshold = DET_DEAUTH_THRESHOLD;
     det_beacon_threshold = DET_BEACON_FLOOD_THRESHOLD;
 
+    cred_harvest = true;
+
     geo_enabled = false;
     geo_lat = 0.0;
     geo_lon = 0.0;

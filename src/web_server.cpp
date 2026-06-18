@@ -14,6 +14,7 @@
 #include "settings.h"
 #include "statistics.h"
 #include "detector.h"
+#include "credentials.h"
 #include "filter.h"
 #include "ring_buffer.h"
 #include "pcap_writer.h"
@@ -144,6 +145,7 @@ void WebInterface::routes() {
         d["ap_count"]  = Statistics::instance().apCount();
         d["sta_count"] = Statistics::instance().staCount();
         d["alert_count"] = Detectors::instance().alertCount();
+        d["cred_count"] = CredentialHarvester::instance().total();
         d["pcap_open"] = PcapWriter::instance().isOpen();
         d["pcap_bytes"]= PcapWriter::instance().bytesWritten();
         d["clients"]   = WebInterface::instance().clientCount();
@@ -231,6 +233,41 @@ void WebInterface::routes() {
         sendMsg(req, 200, "cleared");
     });
 
+    // ---- harvested cleartext credentials ----
+    srv.on("/api/creds", HTTP_GET, [](AsyncWebServerRequest* req) {
+        uint32_t since = 0;
+        if (req->hasParam("since")) since = req->getParam("since")->value().toInt();
+        static const char* PROTO[] = {"http-basic","http-form","ftp","pop3","imap","smtp","telnet"};
+        Credential* buf = (Credential*)malloc(sizeof(Credential) * CRED_MAX_ENTRIES);
+        if (!buf) { sendMsg(req, 503, "out of memory"); return; }
+        uint16_t n = CredentialHarvester::instance().recent(buf, CRED_MAX_ENTRIES, since);
+        JsonDocument d;
+        d["total"] = CredentialHarvester::instance().total();
+        JsonArray arr = d["creds"].to<JsonArray>();
+        char ip[16];
+        for (uint16_t i = 0; i < n; i++) {
+            JsonObject o = arr.add<JsonObject>();
+            o["id"] = buf[i].id;
+            o["ts"] = (double)buf[i].timestamp_us / 1000000.0;
+            o["proto"] = PROTO[buf[i].proto <= 6 ? buf[i].proto : 0];
+            o["channel"] = buf[i].channel;
+            snprintf(ip, sizeof(ip), "%u.%u.%u.%u", buf[i].src_ip[0], buf[i].src_ip[1], buf[i].src_ip[2], buf[i].src_ip[3]);
+            o["src"] = ip;
+            snprintf(ip, sizeof(ip), "%u.%u.%u.%u", buf[i].dst_ip[0], buf[i].dst_ip[1], buf[i].dst_ip[2], buf[i].dst_ip[3]);
+            o["dst"] = ip;
+            o["port"] = buf[i].dst_port;
+            o["username"] = buf[i].username;
+            o["password"] = buf[i].password;
+            o["context"] = buf[i].context;
+        }
+        free(buf);   // JSON has copied all string values
+        sendJson(req, 200, d);
+    });
+    srv.on("/api/creds/clear", HTTP_POST, [](AsyncWebServerRequest* req) {
+        CredentialHarvester::instance().clear();
+        sendMsg(req, 200, "cleared");
+    });
+
     // ---- single frame detail (hex + decode) ----
     srv.on("/api/frame", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!req->hasParam("id")) { sendMsg(req, 400, "id required"); return; }
@@ -290,6 +327,7 @@ void WebInterface::routes() {
         d["det_dns_anomaly"] = s.det_dns_anomaly; d["det_beacon_flood"] = s.det_beacon_flood;
         d["det_deauth_threshold"] = s.det_deauth_threshold;
         d["det_beacon_threshold"] = s.det_beacon_threshold;
+        d["cred_harvest"] = s.cred_harvest;
         d["geo_enabled"] = s.geo_enabled; d["geo_lat"] = s.geo_lat;
         d["geo_lon"] = s.geo_lon; d["geo_label"] = s.geo_label;
         JsonArray ce = d["channel_enabled"].to<JsonArray>();
@@ -338,6 +376,7 @@ void WebInterface::routes() {
             if (b["det_beacon_flood"].is<bool>()) s.det_beacon_flood = b["det_beacon_flood"];
             if (b["det_deauth_threshold"].is<int>()) { int v=b["det_deauth_threshold"]; s.det_deauth_threshold=constrain(v,2,1000); }
             if (b["det_beacon_threshold"].is<int>()) { int v=b["det_beacon_threshold"]; s.det_beacon_threshold=constrain(v,5,1000); }
+            if (b["cred_harvest"].is<bool>()) s.cred_harvest = b["cred_harvest"];
             if (b["geo_enabled"].is<bool>()) s.geo_enabled = b["geo_enabled"];
             if (b["geo_lat"].is<double>()) s.geo_lat = b["geo_lat"];
             if (b["geo_lon"].is<double>()) s.geo_lon = b["geo_lon"];
@@ -531,6 +570,7 @@ void WebInterface::pump() {
         d["sta"] = Statistics::instance().staCount();
         d["ch"] = Sniffer::instance().currentChannel();
         d["alerts"] = Detectors::instance().alertCount();
+        d["creds"] = CredentialHarvester::instance().total();
         Alert la;
         if (Detectors::instance().alertCount() > _alertCursor && Detectors::instance().lastAlert(la)) {
             _alertCursor = la.id;
