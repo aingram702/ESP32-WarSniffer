@@ -27,9 +27,12 @@ static inline uint8_t scale(uint8_t v) {
 }
 
 void StatusLed::write(uint8_t r, uint8_t g, uint8_t b) {
-#if defined(RGB_BUILTIN) || defined(WARSNIFFER_LED_PIN)
-    // rgbLedWrite is provided by the Arduino-ESP32 core for addressable LEDs.
+    // Drive the on-board WS2812. rgbLedWrite() exists on Arduino-ESP32 3.x;
+    // neopixelWrite() is the equivalent on the 2.0.x core used here.
+#if defined(ARDUINO_ESP32_RELEASE_3_0_0) || ESP_ARDUINO_VERSION_MAJOR >= 3
     rgbLedWrite(WARSNIFFER_LED_PIN, r, g, b);
+#else
+    neopixelWrite(WARSNIFFER_LED_PIN, r, g, b);
 #endif
 }
 
